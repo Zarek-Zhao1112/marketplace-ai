@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newegg 跨境 BD 智能助手 · 作品集</title>
+    <meta name="description" content="基于 Python + Streamlit 构建的 Newegg 卖家运营数据分析平台">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        bg: '#0F1923',
+                        'bg-alt': '#1A2634',
+                        card: '#1F2D3D',
+                        accent: '#FF4655',
+                        'accent-hover': '#FF5C6B',
+                        text: '#ECE8E1',
+                        'text-dim': '#8B9CB6',
+                        border: '#2C3E50',
+                    },
+                    fontFamily: {
+                        display: ['Rajdhani', 'sans-serif'],
+                        body: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background: #0F1923;
+            color: #ECE8E1;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+        }
+
+        /* ── Hero background ── */
+        .hero {
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0F1923;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 80% 60% at 50% 40%, rgba(255, 70, 85, 0.08) 0%, transparent 70%),
+                radial-gradient(ellipse 40% 50% at 80% 80%, rgba(255, 70, 85, 0.05) 0%, transparent 60%);
+        }
+
+        .hero-grid {
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .hero-title {
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 700;
+            letter-spacing: -1px;
+            line-height: 1.1;
+            animation: fade-up 0.8s ease-out 0.2s both;
+        }
+
+        .hero-title span {
+            background: linear-gradient(90deg, #FF4655, #FF8A95);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-accent-line {
+            width: 60px;
+            height: 3px;
+            background: #FF4655;
+            margin: 1.5rem auto;
+            border-radius: 2px;
+            animation: fade-up 0.8s ease-out 0.4s both;
+        }
+
+        .hero-sub {
+            font-size: clamp(1.1rem, 2vw, 1.4rem);
+            color: #8B9CB6;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+            animation: fade-up 0.8s ease-out 0.5s both;
+        }
+
+        .hero-badge {
+            display: inline-block;
+            background: rgba(255, 70, 85, 0.1);
+            border: 1px solid rgba(255, 70, 85, 0.3);
+            color: #FF4655;
+            padding: 0.4rem 1.2rem;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-bottom: 1.5rem;
+            animation: fade-up 0.8s ease-out 0.1s both;
+        }
+
+        @keyframes fade-up {
+            from { opacity: 0; transform: translateY(30px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            color: #8B9CB6;
+            font-size: 0.75rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            animation: fade-up 0.8s ease-out 0.8s both;
+        }
+
+        .scroll-indicator .arrow {
+            width: 20px;
+            height: 20px;
+            border-right: 2px solid #FF4655;
+            border-bottom: 2px solid #FF4655;
+            transform: rotate(45deg);
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: rotate(45deg) translateY(0); opacity: 0.5; }
+            50%      { transform: rotate(45deg) translateY(8px); opacity: 1; }
+        }
+
+        /* ── Impact stats ── */
+        .stat-number {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: clamp(3rem, 5vw, 4rem);
+            font-weight: 700;
+            line-height: 1;
+            background: linear-gradient(135deg, #ECE8E1, #FF4655);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* ── Section ── */
+        section {
+            padding: 5rem 1.5rem;
+        }
+
+        .section-title {
+            font-size: clamp(1.8rem, 3vw, 2.5rem);
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .section-sub {
+            color: #8B9CB6;
+            text-align: center;
+            max-width: 500px;
+            margin: 0 auto 3rem;
+            font-size: 1rem;
+        }
+
+        /* ── Feature cards ── */
+        .feature-card {
+            background: #1F2D3D;
+            border: 1px solid #2C3E50;
+            border-radius: 16px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 3px;
+            height: 100%;
+            background: #FF4655;
+            border-radius: 3px 0 0 3px;
+        }
+
+        .feature-card:hover {
+            border-color: #FF4655;
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(255, 70, 85, 0.12);
+        }
+
+        .feature-visual {
+            background: linear-gradient(135deg, rgba(255, 70, 85, 0.08), rgba(0, 0, 0, 0.2));
+            border: 1px solid #2C3E50;
+            border-radius: 12px;
+            padding: 2.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+            font-size: 3rem;
+            color: #FF4655;
+        }
+
+        .feature-tag {
+            display: inline-block;
+            background: rgba(255, 70, 85, 0.1);
+            color: #FF4655;
+            padding: 0.2rem 0.8rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-right: 0.4rem;
+            margin-bottom: 0.4rem;
+        }
+
+        /* ── Tech icons ── */
+        .tech-icon {
+            width: 72px;
+            height: 72px;
+            background: #1F2D3D;
+            border: 1px solid #2C3E50;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            font-size: 2rem;
+            color: #8B9CB6;
+            transition: all 0.3s ease;
+        }
+
+        .tech-icon:hover {
+            border-color: #FF4655;
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(255, 70, 85, 0.15);
+            color: #ECE8E1;
+        }
+
+        .tech-icon span {
+            font-size: 0.65rem;
+            color: #8B9CB6;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tech-icon:hover span {
+            color: #FF4655;
+        }
+
+        /* ── CTA ── */
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: linear-gradient(135deg, #FF4655, #BD3944);
+            color: #ECE8E1;
+            padding: 0.9rem 2rem;
+            border-radius: 8px;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 1.05rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 20px rgba(255, 70, 85, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #FF5C6B, #FF4655);
+            box-shadow: 0 6px 30px rgba(255, 70, 85, 0.5);
+            transform: translateY(-2px);
+            color: #ECE8E1;
+        }
+
+        .btn-outline {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: transparent;
+            color: #ECE8E1;
+            padding: 0.9rem 2rem;
+            border-radius: 8px;
+            border: 1px solid #2C3E50;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 1.05rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .btn-outline:hover {
+            border-color: #FF4655;
+            color: #FF4655;
+            transform: translateY(-2px);
+            color: #FF4655;
+        }
+
+        /* ── Footer ── */
+        .footer-link {
+            color: #8B9CB6;
+            transition: color 0.2s;
+            text-decoration: none;
+        }
+
+        .footer-link:hover {
+            color: #FF4655;
+        }
+
+        .social-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: #1F2D3D;
+            border: 1px solid #2C3E50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #8B9CB6;
+            font-size: 1.2rem;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+        .social-icon:hover {
+            border-color: #FF4655;
+            color: #FF4655;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(255, 70, 85, 0.15);
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 768px) {
+            section { padding: 3rem 1rem; }
+            .feature-card { padding: 1.5rem; }
+            .feature-visual { min-height: 140px; padding: 1.5rem; font-size: 2rem; }
+            .tech-icon { width: 60px; height: 60px; font-size: 1.5rem; }
+        }
+
+        /* ── Stagger delay helpers ── */
+        .stagger-1 { transition-delay: 0.1s; }
+        .stagger-2 { transition-delay: 0.2s; }
+        .stagger-3 { transition-delay: 0.3s; }
+        .stagger-4 { transition-delay: 0.4s; }
+    </style>
+</head>
+<body>
+
+    <!-- ═══════════════════ HERO ═══════════════════ -->
+    <section class="hero" id="home">
+        <div class="hero-grid"></div>
+        <div class="hero-content">
+            <div class="hero-badge">Python · Streamlit · AI</div>
+            <h1 class="hero-title">
+                Newegg <span>跨境 BD</span> 智能助手
+            </h1>
+            <div class="hero-accent-line"></div>
+            <p class="hero-sub">
+                面向电商运营的数据分析平台 — 卖家健康度评分、SKU 分级治理、AI 回复建议、品牌线索挖掘，全链路提升运营效率
+            </p>
+        </div>
+        <div class="scroll-indicator">
+            <span>向下滚动</span>
+            <div class="arrow"></div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════ IMPACT ═══════════════════ -->
+    <section class="bg-[#1A2634]" id="impact">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="section-title" data-aos="fade-up">核心数据</h2>
+            <p class="section-sub" data-aos="fade-up" data-aos-delay="100">真实运营场景 · 可量化的结果</p>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                <div class="feature-card text-center" data-aos="fade-up" data-aos-delay="0">
+                    <div class="stat-number" data-count="80">0</div>
+                    <p class="text-text-dim text-sm mt-2 font-medium uppercase tracking-wider">服务卖家</p>
+                </div>
+                <div class="feature-card text-center" data-aos="fade-up" data-aos-delay="100">
+                    <div class="stat-number"><span data-count="50">0</span>K+</div>
+                    <p class="text-text-dim text-sm mt-2 font-medium uppercase tracking-wider">单卖家月均 GMV</p>
+                </div>
+                <div class="feature-card text-center" data-aos="fade-up" data-aos-delay="200">
+                    <div class="stat-number" data-count="4">0</div>
+                    <p class="text-text-dim text-sm mt-2 font-medium uppercase tracking-wider">智能分级体系</p>
+                </div>
+                <div class="feature-card text-center" data-aos="fade-up" data-aos-delay="300">
+                    <div class="stat-number" data-count="87">0</div>
+                    <p class="text-text-dim text-sm mt-2 font-medium uppercase tracking-wider">问题解决率</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════ TECH STACK ═══════════════════ -->
+    <section id="tech">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="section-title" data-aos="fade-up">技术栈</h2>
+            <p class="section-sub" data-aos="fade-up" data-aos-delay="100">构建这个项目的核心工具</p>
+
+            <div class="flex flex-wrap justify-center gap-4 md:gap-6" data-aos="fade-up" data-aos-delay="200">
+                <div class="tech-icon stagger-1">
+                    <i class="fa-brands fa-python"></i>
+                    <span>Python</span>
+                </div>
+                <div class="tech-icon stagger-2">
+                    <i class="fa-solid fa-chart-simple"></i>
+                    <span>Streamlit</span>
+                </div>
+                <div class="tech-icon stagger-3">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>Plotly</span>
+                </div>
+                <div class="tech-icon stagger-4">
+                    <i class="fa-solid fa-table"></i>
+                    <span>Pandas</span>
+                </div>
+                <div class="tech-icon stagger-1">
+                    <i class="fa-solid fa-brain"></i>
+                    <span>AI / LLM</span>
+                </div>
+                <div class="tech-icon stagger-2">
+                    <i class="fa-solid fa-file-excel"></i>
+                    <span>openpyxl</span>
+                </div>
+                <div class="tech-icon stagger-3">
+                    <i class="fa-solid fa-spider"></i>
+                    <span>Playwright</span>
+                </div>
+                <div class="tech-icon stagger-4">
+                    <i class="fa-brands fa-github"></i>
+                    <span>GitHub</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════ FEATURES ═══════════════════ -->
+    <section class="bg-[#1A2634]" id="features">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="section-title" data-aos="fade-up">核心功能</h2>
+            <p class="section-sub" data-aos="fade-up" data-aos-delay="100">从数据到决策，一站式运营工具</p>
+
+            <!-- Feature 1 -->
+            <div class="feature-card mb-6" data-aos="fade-right">
+                <div class="flex flex-col md:flex-row items-center gap-6 md:gap-10">
+                    <div class="feature-visual flex-1 w-full">
+                        <div class="text-center">
+                            <i class="fa-solid fa-heart-pulse fa-3x text-accent mb-3"></i>
+                            <div class="text-text-dim text-sm">雷达图 · 健康度评分</div>
+                        </div>
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex flex-wrap gap-1 mb-3">
+                            <span class="feature-tag">GMV 分析</span>
+                            <span class="feature-tag">毛利率</span>
+                            <span class="feature-tag">RMA 追踪</span>
+                        </div>
+                        <h3 class="text-2xl font-display font-bold mb-2">卖家健康度评分</h3>
+                        <p class="text-text-dim leading-relaxed">
+                            上传销售与库存 Excel，自动计算 GMV、毛利、RMA%、销量、SKU 数、毛利率六维评分，
+                            输出 A/B/C/D 四级分类，精准定位高潜卖家和问题卖家。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature 2 -->
+            <div class="feature-card mb-6" data-aos="fade-left">
+                <div class="flex flex-col md:flex-row-reverse items-center gap-6 md:gap-10">
+                    <div class="feature-visual flex-1 w-full">
+                        <div class="text-center">
+                            <i class="fa-solid fa-layer-group fa-3x text-accent mb-3"></i>
+                            <div class="text-text-dim text-sm">风险 × 效率矩阵</div>
+                        </div>
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex flex-wrap gap-1 mb-3">
+                            <span class="feature-tag">SKU 分类</span>
+                            <span class="feature-tag">库存深度</span>
+                            <span class="feature-tag">风险评分</span>
+                        </div>
+                        <h3 class="text-2xl font-display font-bold mb-2">SKU 分级治理</h3>
+                        <p class="text-text-dim leading-relaxed">
+                            风险等级 × 效率等级的二维矩阵分类，自动标注保留/清仓/提价等处置建议。
+                            告别盲目管 SKU，聚焦高价值产品。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature 3 -->
+            <div class="feature-card mb-6" data-aos="fade-right">
+                <div class="flex flex-col md:flex-row items-center gap-6 md:gap-10">
+                    <div class="feature-visual flex-1 w-full">
+                        <div class="text-center">
+                            <i class="fa-solid fa-robot fa-3x text-accent mb-3"></i>
+                            <div class="text-text-dim text-sm">AI · 自动提取 · 自动回复</div>
+                        </div>
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex flex-wrap gap-1 mb-3">
+                            <span class="feature-tag">豆包 ARK</span>
+                            <span class="feature-tag">RAG</span>
+                            <span class="feature-tag">自动学习</span>
+                        </div>
+                        <h3 class="text-2xl font-display font-bold mb-2">AI 问题管理 + 回复建议</h3>
+                        <p class="text-text-dim leading-relaxed">
+                            粘贴卖家聊天记录 → AI 提取结构化问题 → 匹配知识库与经验库 →
+                            生成回复建议。支持用户修改反馈形成学习闭环，越用越聪明。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature 4 -->
+            <div class="feature-card mb-6" data-aos="fade-left">
+                <div class="flex flex-col md:flex-row-reverse items-center gap-6 md:gap-10">
+                    <div class="feature-visual flex-1 w-full">
+                        <div class="text-center">
+                            <i class="fa-solid fa-magnifying-glass-chart fa-3x text-accent mb-3"></i>
+                            <div class="text-text-dim text-sm">Hunter.io · AI 官网分析</div>
+                        </div>
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex flex-wrap gap-1 mb-3">
+                            <span class="feature-tag">邮箱挖掘</span>
+                            <span class="feature-tag">品牌分析</span>
+                            <span class="feature-tag">招商邮件</span>
+                        </div>
+                        <h3 class="text-2xl font-display font-bold mb-2">品牌线索挖掘</h3>
+                        <p class="text-text-dim leading-relaxed">
+                            Hunter.io 企业邮箱查询 + 官网内容 AI 分析 + 品牌百科信息提取。
+                            一键生成个性化招商邮件，把品牌调研从小时级压缩到分钟级。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature 5 -->
+            <div class="feature-card" data-aos="fade-right">
+                <div class="flex flex-col md:flex-row items-center gap-6 md:gap-10">
+                    <div class="feature-visual flex-1 w-full">
+                        <div class="text-center">
+                            <i class="fa-solid fa-file-export fa-3x text-accent mb-3"></i>
+                            <div class="text-text-dim text-sm">openpyxl · 多Sheet · 图表</div>
+                        </div>
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex flex-wrap gap-1 mb-3">
+                            <span class="feature-tag">Excel 导出</span>
+                            <span class="feature-tag">可视化报表</span>
+                            <span class="feature-tag">自动化</span>
+                        </div>
+                        <h3 class="text-2xl font-display font-bold mb-2">全景报表导出</h3>
+                        <p class="text-text-dim leading-relaxed">
+                            一键生成专业 Excel 报告 — 卖家分级饼图、GMV 贡献柱图、指标分布、风险矩阵。
+                            多 Sheet 结构化输出，图表自动生成，汇报直接用。
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════ CTA ═══════════════════ -->
+    <section id="cta">
+        <div class="max-w-4xl mx-auto text-center">
+            <h2 class="section-title" data-aos="fade-up">想了解更多？</h2>
+            <p class="section-sub" data-aos="fade-up" data-aos-delay="100">
+                完整源码在 GitHub，功能演示可在线体验
+            </p>
+            <div class="flex flex-wrap justify-center gap-4" data-aos="fade-up" data-aos-delay="200">
+                <a href="https://github.com/Zarek-Zhao1112/marketplace-ai" target="_blank" class="btn-primary">
+                    <i class="fa-brands fa-github"></i>
+                    查看源码
+                </a>
+                <a href="#" target="_blank" class="btn-outline" id="demoBtn">
+                    <i class="fa-solid fa-rocket"></i>
+                    在线演示
+                </a>
+            </div>
+            <p class="text-text-dim text-sm mt-6" data-aos="fade-up" data-aos-delay="300">
+                技术面试官？<a href="https://github.com/Zarek-Zhao1112/marketplace-ai" target="_blank" class="text-accent hover:underline">GitHub 仓库</a> 
+                有完整代码和架构文档
+            </p>
+        </div>
+    </section>
+
+    <!-- ═══════════════════ CONTACT ═══════════════════ -->
+    <footer class="border-t border-[#2C3E50] py-8">
+        <div class="max-w-4xl mx-auto text-center px-4">
+            <div class="flex justify-center gap-3 mb-4">
+                <a href="https://github.com/Zarek-Zhao1112" target="_blank" class="social-icon" title="GitHub">
+                    <i class="fa-brands fa-github"></i>
+                </a>
+                <a href="mailto:2519016380@qq.com" class="social-icon" title="Email">
+                    <i class="fa-solid fa-envelope"></i>
+                </a>
+            </div>
+            <p class="text-text-dim text-sm">
+                Built by <span class="text-text font-semibold">赵振伟 (Zarek)</span> · 2026
+            </p>
+        </div>
+    </footer>
+
+    <!-- ═══════════════════ SCRIPTS ═══════════════════ -->
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script>
+        AOS.init({
+            duration: 700,
+            once: true,
+            offset: 80,
+        });
+
+        // ── Count-up animation ──
+        const countEls = document.querySelectorAll('[data-count]');
+
+        const countUp = (el) => {
+            const target = parseInt(el.dataset.count, 10);
+            const duration = 1500;
+            const start = performance.now();
+
+            const animate = (now) => {
+                const elapsed = now - start;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                const current = Math.floor(eased * target);
+                el.textContent = current;
+                if (progress < 1) requestAnimationFrame(animate);
+                else el.textContent = target;
+            };
+
+            requestAnimationFrame(animate);
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const el = entry.target;
+                    countUp(el);
+                    observer.unobserve(el);
+                }
+            });
+        }, { threshold: 0.5 });
+
+        countEls.forEach(el => observer.observe(el));
+
+        // ── Stagger entrance for tech icons ──
+        const techIcons = document.querySelectorAll('.tech-icon');
+        const techObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    techIcons.forEach((icon, i) => {
+                        setTimeout(() => {
+                            icon.style.opacity = '1';
+                            icon.style.transform = 'translateY(0)';
+                        }, i * 100);
+                    });
+                    techObserver.disconnect();
+                }
+            });
+        }, { threshold: 0.3 });
+
+        techIcons.forEach(icon => {
+            icon.style.opacity = '0';
+            icon.style.transform = 'translateY(20px)';
+            icon.style.transition = 'all 0.4s ease';
+        });
+        techObserver.observe(document.querySelector('#tech .flex-wrap'));
+    </script>
+</body>
+</html>

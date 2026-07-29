@@ -2,150 +2,179 @@
 
 ## 项目简介
 
-Streamlit Web应用，帮助Newegg Marketplace运营人员进行卖家分析和SKU管理。
+Streamlit Web应用, 帮Newegg运营做卖家分析+SKU管理。
 
 - **技术栈**: Python + Streamlit + Plotly + openpyxl
-- **AI后端**: 豆包(ARK) API（仅问题管理模块使用）
-- **数据存储**: Excel + JSON文件，无数据库
+- **AI后端**: 豆包(ARK) API（问题管理+AI回复建议）
+- **数据存储**: Excel + JSON文件, 无数据库
 
 ## 核心规则
 
-1. **中文回复** - 用户语言是中文
-2. **简单优先** - 不过度设计，用户会主动删复杂功能
-3. **先方案后行动** - 任何修改前先展示方案给用户确认
-4. **数据安全** - 销售数据是隐私数据，读取前需提醒用户
+1. **中文回复**
+2. **简单优先** - 用户删复杂功能
+3. **先方案后行动** - 改前先展示方案
+4. **数据安全** - 销售数据读取前提醒用户
 
 ## 目录结构
 
 ```
 marketplace-ai/
-├── app.py                 # 入口文件（运营总览）
-├── pages/                 # Streamlit多页面
+├── app.py                 # 入口（运营总览）
+├── pages/                 # Streamlit多页面（薄包装→tabs）
 │   ├── 2_问题管理.py
 │   ├── 3_品牌线索.py
 │   ├── 4_商家通讯录.py
 │   ├── 5_招商管理.py
-│   └── 6_卖家分析.py      # 核心页面
+│   └── 6_卖家分析.py      # 4行 → src/web/tabs/seller_tab.py
 ├── src/
-│   ├── config/settings.py # 配置集中
+│   ├── config/settings.py
 │   ├── web/
-│   │   ├── seller_analysis.py  # 计算逻辑
-│   │   ├── utils.py            # 导出函数
-│   │   ├── data.py             # 数据加载
-│   │   ├── styles.py           # UI样式
-│   │   └── config.py           # 配置兼容层
-│   └── knowledge/         # 知识库
-├── data/                  # 数据文件
+│   │   ├── seller_analysis.py  # 计算逻辑（safe_float/safe_int）
+│   │   ├── utils.py            # Excel I/O + 文本工具（74行）
+│   │   ├── excel_export.py     # openpyxl导出+图表（809行）
+│   │   ├── web_scraper.py      # requests+Playwright（66行）
+│   │   ├── data.py             # 数据加载（mtime缓存）
+│   │   ├── ai.py               # AI功能（Hunter邮箱+品牌分析）
+│   │   ├── styles.py           # UI样式（Valorant深色主题）
+│   │   ├── sidebar.py          # 侧边栏
+│   │   └── tabs/
+│   │       ├── seller_tab.py   # 卖家分析（1297行）
+│   │       ├── issues.py       # 问题管理
+│   │       ├── leads.py        # 品牌线索
+│   │       ├── contacts.py     # 商家通讯录
+│   │       ├── emails.py       # 招商管理
+│   │       └── dashboard.py    # 运营总览
+│   └── knowledge/
+│       ├── experience_library.py
+│       └── newegg_seller_academy.py  # 17个模块
+├── data/
 │   ├── sku_analysis/      # SKU分析JSON（80个seller）
-│   └── competitor_analysis/ # 竞品数据（爬虫抓取）
-├── reports/               # 运营报告
-├── .opencode/skills/      # AI技能
-│   ├── marketplace-analysis/ # 分析助手（含分层分析）
-│   ├── superpowers-zh/       # AI编程方法论（20个skills）
-│   ├── planning-with-files/  # 基于文件的持久化规划
-│   └── agent-skill-creator/  # Skill创建和管理工具
-├── docs/                  # 文档
-└── marketplace-analysis-skill.zip  # skill压缩包（给同事用）
+│   └── competitor_analysis/
+├── reports/
+├── docs/
+└── .opencode/skills/
 ```
 
-## 卖家分析模块
+## 卖家分析
 
-核心功能在 `pages/6_卖家分析.py` + `src/web/seller_analysis.py`：
+核心: `pages/6_卖家分析.py` + `src/web/seller_analysis.py`：
 
-- **健康度评分**: GMV(30分) + 毛利(25分) + RMA%(20分) + 销量(10分) + SKU数(10分) + 毛利率(5分)
-- **等级划分**: A≥75 / B≥60 / C≥45 / D<45
+- **健康度评分**: GMV(30) + 毛利(25) + RMA%(20) + 销量(10) + SKU数(10) + 毛利率(5)
+  - GMV: $50K=30分（行业基准对齐）
+  - RMA%: ≤2%→20, ≤5%→16, ≤8%→12, ≤15%→8, ≤25%→4
+- **等级**: A≥75 / B≥60 / C≥45 / D<45
 - **优先级评分**: 退货损失(40%) + 毛利侵蚀(30%) + RMA严重度(20%) + 动销逆向(10%)
-- **RMA%计算**: 必须排除退货记录(GMV<0)，只算正常销售
+- **RMA%计算**: 排除退货(GMV<0), 只算正常销售
+
+## 问题管理 + AI回复建议
+
+核心: `pages/2_问题管理.py` + `src/web/tabs/issues.py`：
+
+- **聊天记录解析**: `_parse_chat()` 统一入口, 支持纯文本和图片+文本
+- **AI提取问题**: 豆包AI从聊天记录自动提取结构化问题
+- **经验库搜索**: 关键词匹配+AI语义检索
+- **AI回复建议**: 基于Newegg Seller Academy知识库
+- **AI学习闭环**: 用户修改回复→保存到经验库, AI学习风格
+- **缓存**: 文件mtime感知, 删除/修改后自动失效
+
+## 知识库（Newegg Seller Academy）
+
+核心: `src/knowledge/newegg_seller_academy.py`（17个模块）
+
+| 模块 | 内容 |
+|------|------|
+| platform | 平台基础 |
+| registration | 卖家注册流程 |
+| items | 商品创建/更新/批量/变体 |
+| orders | 订单列表/发货/批量/多渠道 |
+| rma | 退货授权/无退货退款/Marketplace Guarantee |
+| promotion | 5种活动+折扣码+提交表 |
+| messages | 消息3.0+模板功能 |
+| analytics | 销售仪表盘+按日期/商品报表 |
+| advertising | 5种广告+站外推广 |
+| sbn | 多渠道拣配+仓库货件+库存警报 |
+| store | 普通店铺+会员店铺 |
+| performance | 账户健康Dashboard+绩效指标 |
+| faq | 常见问题 |
+| policies | 平台政策 |
+| b2b/ca | B2B/CA特殊政策 |
+| reply | AI回复建议模板 |
+
+查询: `get_knowledge(category)` + `search_knowledge(query)`
 
 ## 报告生成规则
 
-- 报告文件放在 `reports/` 文件夹
-- 报告文件不含"与导师沟通要点"
-- "与导师沟通要点"单独在对话界面发给用户
-- 报告必须包含"与卖家沟通指南"章节
+- 报告放 `reports/` 文件夹
+- 不含"与导师沟通要点"
+- "沟通要点"单独对话界面发给用户
+- 报告必须含"与卖家沟通指南"章节
 
 ## AI技能
 
-### 已安装的Skills
-
 | Skill | 来源 | 用途 |
 |-------|------|------|
-| **marketplace-analysis** | 项目内置 | Newegg卖家数据分析助手 |
+| **deep-seller-analysis** | 项目内置 | 深度卖家分析（多站点+知识库+经验库） |
+| **sellingpilot-pitch** | 项目内置 | SellingPilot推销话术 |
+| **dealer-recruitment** | 项目内置 | 经销商招募 |
+| **humanizer-zh** | 第三方 | 去除AI痕迹 |
 | **superpowers-zh** | 第三方 | AI编程方法论（20个skills） |
-| **planning-with-files** | 第三方 | 基于文件的持久化规划 |
-| **agent-skill-creator** | 第三方 | Skill创建和管理工具 |
+| **planning-with-files** | 第三方 | 文件式持久化规划 |
+| **agent-skill-creator** | 第三方 | Skill创建和管理 |
 
-### marketplace-analysis（卖家分析助手）
-- 合并了运营诊断报告和卖家增长策略
-- 触发词："分析卖家"、"卖家分析"、"运营报告"、"SKU优化"、"竞品分析"、"评论分析"、"周报"
-- 包含：SKILL.md、competitor-price-analysis.md、product-review-analysis.md、newegg-scraper.md
-- 支持Excel输入：`[卖家ID]_[日期范围].xlsx`，每个Sheet一个时间段
+### deep-seller-analysis
+- 触发: `深度分析[卖家ID]`、`卖家深度分析`、`运营诊断报告`
+- 数据: `data/sku_analysis/{seller_id}/` JSON
+- 脚本: `.opencode/skills/deep-seller-analysis/analyze.py`
+- 知识库: `newegg_seller_academy.py` 17个模块
+- 经验库: `experience_library.py`
+- 模板: B2C标准 / CA站点 / B2B站点 / 多站点综合 / C/D精简
 
-### marketplace-analysis 迭代流程
+### 分层分析
+- **履约**: SBS vs SBN
+- **成色**: 全新/翻新/二手
+- **品类**: 显卡/主板/处理器/固态硬盘/外设
+- **规模**: 大(>$50K)/中($10K-50K)/小(<$10K)
 
-```
-1. 你用系统导出Excel（3个月数据，按月份分Sheet）
-2. 把Excel给导师 → 导师用公司内部AI+skill → 生成报告
-3. 你用报告跟卖家沟通 → 收到反馈
-4. 你告诉我哪里不对 → 我修改skill
-5. 下次导师用更新后的skill → 报告更准
-```
-
-**反馈记录位置**：skill文件末尾的"迭代反馈机制"章节
-
-### superpowers-zh（AI编程超能力）
-- 20个AI编程方法论skills
-- 常用skills：
-  - `/brainstorming` - 需求分析和头脑风暴
-  - `/writing-plans` - 编写实施计划
-  - `/executing-plans` - 按计划执行
-  - `/systematic-debugging` - 系统化调试
-  - `/test-driven-development` - 测试驱动开发
-  - `/chinese-code-review` - 中文代码审查
-
-### planning-with-files（持久化规划）
-- 基于文件的任务规划，防止AI在长对话中忘记目标
-- 会创建 `task_plan.md`、`findings.md`、`progress.md` 跟踪进度
-- 适合复杂任务：批量数据导入、多步骤功能开发
-
-### agent-skill-creator（Skill创建工具）
-- 创建、验证和管理AI skills
-- 用于开发和维护marketplace-analysis等自定义skill
-
-### 分层分析框架
-- **履约方式**：SBS（Ship by Seller）vs SBN（Ship by Newegg）
-- **商品成色**：全新/翻新/二手
-- **品类**：显卡/主板/处理器/固态硬盘/外设
-- **卖家规模**：大卖家(>$50K)/中等($10K-50K)/小卖家(<$10K)
-
-### 数据抓取规则
-- 使用 requests + BeautifulSoup 抓取Newegg数据
-- **先建议后执行**：告诉用户抓什么、为什么抓，等用户确认
-- 数据保存到 `data/competitor_analysis/`
-- 支持成色筛选：翻新品(`&N=100007709`)、全部
-- 支持履约方式筛选：SBN(`&shippage=1`)、全部
+### 数据抓取
+- requests + BeautifulSoup 抓Newegg
+- **先建议后执行** - 告知抓什么、为何抓, 等确认
+- 保存到 `data/competitor_analysis/`
 
 ## 关键函数
 
 | 函数 | 位置 | 用途 |
 |------|------|------|
 | `calc_seller_health_score` | seller_analysis.py | 健康度评分 |
-| `calc_return_qty` | seller_analysis.py | 退货件数（math.ceil，RMA%=0返回0） |
+| `calc_return_qty` | seller_analysis.py | 退货件数（math.ceil, RMA%=0→0） |
 | `calc_priority_score` | seller_analysis.py | 优先级评分（四维度加权） |
-| `calc_seller_health_from_sku` | seller_analysis.py | 卖家健康度（排除退货记录算RMA%） |
 | `extract_category` | seller_analysis.py | 品类分类（跳过CH前缀） |
-| `extract_condition` | seller_analysis.py | 商品成色（优先用ItemCondition） |
-| `parse_date_any` | pages/6_卖家分析.py | 日期解析（支持多种格式） |
-| `export_sku_excel` | utils.py | Excel导出 |
+| `safe_float/safe_int` | seller_analysis.py | 安全类型转换 |
+| `safe_analyze` | deep-seller-analysis/analyze.py | 深度卖家分析入口（错误+环比+分层） |
+| `_parse_chat` | tabs/issues.py | 聊天记录解析（重试+缓存） |
+| `parse_date_any` | tabs/seller_tab.py | 日期解析（多格式） |
+| `export_sku_excel` | excel_export.py | SKU分级治理导出 |
+| `export_all_sellers_pano` | excel_export.py | 全景报表（4个Sheet） |
+| `_cached_read_json` | data.py | mtime感知JSON缓存 |
+| `get_knowledge` | newegg_seller_academy.py | 知识库分类查询 |
+| `search_knowledge` | newegg_seller_academy.py | 知识库关键词搜索 |
+
+## 工具脚本
+
+| 脚本 | 用途 | 用法 |
+|------|------|------|
+| `scripts/sync_inventory.py` | BSD库存更新历史JSON | `python scripts/sync_inventory.py <bsd_excel_path>` |
+| `scripts/recalc_metrics.py` | 更新指标 | `python recalc_metrics.py [seller_id]` |
+| `scripts/track_inventory.py` | 库存变化历史 | `python track_inventory.py [seller_id]` |
 
 ## 常见问题
 
-1. **JSON损坏**: `load_sku_analysis_list` 已加错误处理，跳过损坏文件
-2. **numpy序列化**: 写JSON前用 `float()`/`int()` 转换numpy类型
-3. **Plotly样式**: 用 `DARK_LAYOUT` + `AXIS_STYLE` + `dark_title()`
+1. **JSON损坏**: `load_sku_analysis_list` 跳过损坏文件
+2. **numpy序列化**: 写JSON前 `float()`/`int()` 转numpy类型
+3. **Plotly样式**: `DARK_LAYOUT` + `AXIS_STYLE` + `dark_title()`
+4. **Streamlit缓存**: 改代码重启Streamlit
 
-## 用户信息
+## 用户
 
-- **身份**: 电商专业实习生，负责80个Newegg卖家
-- **工作**: AM（Account Manager）- PO控库存、调价格、抓新品
-- **目标**: 帮卖家卖得更好，积累运营/数据/产品思维
+- **身份**: 电商实习生, 负责80个Newegg卖家
+- **工作**: AM - PO控库存、调价格、抓新品
+- **目标**: 帮卖家卖更好, 积累运营/数据/产品思维

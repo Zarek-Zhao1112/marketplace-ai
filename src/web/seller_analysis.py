@@ -4,7 +4,28 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 
-from src.web.config import RMA_RULES, GRADE_RULES
+from src.config.settings import RMA_RULES, GRADE_RULES
+
+
+def safe_float(val, default=0.0):
+    """安全转换为float，处理None/字符串/百分比等"""
+    if val is None or (isinstance(val, float) and np.isnan(val)):
+        return default
+    if isinstance(val, (int, float)):
+        return float(val)
+    if isinstance(val, str):
+        val = val.strip().replace("$", "").replace(",", "").replace("%", "")
+        try:
+            return float(val)
+        except ValueError:
+            return default
+    return default
+
+
+def safe_int(val, default=0):
+    """安全转换为int"""
+    return int(safe_float(val, default))
+
 
 # ── 品类关键词映射 ──
 CATEGORY_MAP = {
@@ -468,7 +489,7 @@ def process_inventory_file(uploaded_file):
 
 
 def merge_and_generate(sales_df, inventory_df, total_gmv, total_margin, period_days=20):
-    gmv_col = rma_col = margin_col = qty_col = None
+    gmv_col = rma_col = margin_col = qty_col = return_qty_col = None
     for c in sales_df.columns:
         cl = str(c).lower()
         if "gmv" in cl:
@@ -477,6 +498,8 @@ def merge_and_generate(sales_df, inventory_df, total_gmv, total_margin, period_d
             rma_col = c
         elif "margin" in cl and "total" in cl:
             margin_col = c
+        elif "quantity returned" in cl or "return quantity" in cl:
+            return_qty_col = c
         elif "net quantity" in cl or "quantity sold" in cl:
             qty_col = c
 
@@ -487,7 +510,7 @@ def merge_and_generate(sales_df, inventory_df, total_gmv, total_margin, period_d
         # 如果库存表没有NeweggItemNumber，返回只有销售数据的DataFrame
         merged = sales_df.copy()
     else:
-        merged = sales_df.merge(inventory_df, on="NeweggItemNumber", how="left", suffixes=("", "_库存"))
+        merged = sales_df.merge(inventory_df, on="NeweggItemNumber", how="outer", suffixes=("", "_库存"))
 
     inv_col = None
     for c in merged.columns:
@@ -506,6 +529,7 @@ def merge_and_generate(sales_df, inventory_df, total_gmv, total_margin, period_d
     cm_col = next((c for c in merged.columns if c == "CM"), None)
     category_col = next((c for c in merged.columns if "categoryname" in str(c).lower()), None)
     seller_name_col = next((c for c in merged.columns if "sellername" in str(c).lower()), None)
+    platform_col = next((c for c in merged.columns if "platform" in str(c).lower()), None)
 
     # 添加SellerID字段（从NeweggItemNumber提取）
     if "NeweggItemNumber" in merged.columns:
@@ -520,6 +544,8 @@ def merge_and_generate(sales_df, inventory_df, total_gmv, total_margin, period_d
         merged["Subcategory"] = merged[subcat_col]
     if seller_name_col:
         merged["SellerName"] = merged[seller_name_col]
+    if platform_col:
+        merged["Platform"] = merged[platform_col]
 
     # 重命名字段以匹配用户期望
     if desc_col_name:
@@ -540,7 +566,14 @@ def merge_and_generate(sales_df, inventory_df, total_gmv, total_margin, period_d
     merged["GMV贡献占比(%)"] = merged.apply(lambda r: calc_gmv_share(r.get(gmv_col, 0), total_gmv) if gmv_col else 0, axis=1)
     merged["毛利贡献占比(%)"] = merged.apply(lambda r: calc_margin_share(r.get(margin_col, 0), total_margin) if margin_col else 0, axis=1)
     merged["退货损失金额"] = merged.apply(lambda r: calc_return_loss(r.get(gmv_col, 0), r.get(rma_col, 0)) if gmv_col and rma_col else 0, axis=1)
-    merged["退货件数"] = merged.apply(lambda r: calc_return_qty(r.get(qty_col, 0), r.get(rma_col, 0)) if qty_col and rma_col else 0, axis=1)
+    if return_qty_col:
+        # 有真实退货件数，直接用
+        merged["退货件数"] = merged[return_qty_col].apply(lambda x: safe_int(x, 0))
+    elif qty_col and rma_col:
+        # 没有退货件数字段，用RMA%反推（有误差）
+        merged["退货件数"] = merged.apply(lambda r: calc_return_qty(r.get(qty_col, 0), r.get(rma_col, 0)), axis=1)
+    else:
+        merged["退货件数"] = 0
     merged["退货毛利侵蚀率"] = merged.apply(
         lambda r: calc_return_margin_erosion(r["退货损失金额"], r.get(margin_col, 0)) if margin_col else 0, axis=1
     )
@@ -595,19 +628,26 @@ def calc_seller_health_score(seller_data):
 
     score = 0
 
-    # GMV评分：线性比例，$100K=30分
+    # GMV评分：线性比例，$50K=30分（与行业基准对齐）
     if total_gmv > 0:
-        score += min(30, round(total_gmv / 100000 * 30, 1))
+        score += min(30, round(total_gmv / 50000 * 30, 1))
 
     # 毛利评分：线性比例，$10K=25分
     if total_margin > 0:
         score += min(25, round(total_margin / 10000 * 25, 1))
 
+    # RMA%评分：与行业基准对齐（≤2%优秀）
     abs_rma = abs(avg_rma)
-    for threshold, rma_score in RMA_RULES:
-        if abs_rma <= threshold:
-            score += rma_score
-            break
+    if abs_rma <= 2:
+        score += 20
+    elif abs_rma <= 5:
+        score += 16
+    elif abs_rma <= 8:
+        score += 12
+    elif abs_rma <= 15:
+        score += 8
+    elif abs_rma <= 25:
+        score += 4
 
     if total_qty >= 50:
         score += 10
