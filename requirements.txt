@@ -1,16 +1,16 @@
-# 核心依赖
+# Core
 python-dotenv>=1.0.0
 pandas>=2.0.0
 openpyxl>=3.1.0
 
-# Web界面
+# Web UI
 streamlit>=1.30.0
 plotly>=5.18.0
 
-# 爬虫
+# Scraping
 requests>=2.31.0
 beautifulsoup4>=4.12.0
 playwright>=1.40.0
 
-# 工具
+# Utils
 pyperclip>=1.8.0
