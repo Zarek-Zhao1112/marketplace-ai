@@ -70,7 +70,7 @@ def calc_mom_change(current, previous):
     
     return {
         "gmv_change_pct": gmv_change,
-        "rma_change_pp": round(rma_curr - rma_prev, 2),
+        "rma_change_pp": round((rma_curr - rma_prev) * 100, 2),
         "margin_change_pct": margin_change,
         "periods": f"{previous.get('date_readable', '?')} → {current.get('date_readable', '?')}",
         "prev_gmv": gmv_prev,
@@ -278,6 +278,7 @@ def safe_analyze(seller_id):
         "date_period": latest.get("date_period", ""),
         "date_readable": latest.get("date_readable", ""),
         "total_months": len(batches),
+        "batches": batches,
         "summary": {
             "health_score": safe_float(summary.get("健康度评分", 0)),
             "grade": summary.get("等级", "D"),

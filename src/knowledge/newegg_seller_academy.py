@@ -150,4 +150,5 @@ MODULE_MAPPING = {
     "global_shipping": "global_shipping",
     "integration": "integration",
     "seller_programs": "seller_programs",
+    "sku_lifecycle": "sku_lifecycle",
 }

@@ -356,25 +356,63 @@ def calc_inventory_depth(inventory):
     else:
         return "深库存"
 
-def get_disposal_suggestion(risk, inventory_depth, efficiency):
+def get_disposal_suggestion(risk, inventory_depth, efficiency, sku_age_days=None, can_return_to_supplier=False, has_bundle_sku=False, is_multi_site=False):
+    """获取SKU处置建议，支持多维度决策树
+
+    Args:
+        risk: 风险等级（低危/中危/高危）
+        inventory_depth: 库存深度（零库存/浅库存/中库存/深库存）
+        efficiency: 效能等级（零销负销/低动销/潜力培育/核心主力）
+        sku_age_days: SKU上架天数（None表示未知）
+        can_return_to_supplier: 供应商是否接受退货
+        has_bundle_sku: 是否有可捆绑的热销SKU
+        is_multi_site: 是否多站点卖家
+    """
+    # 新品保护期
+    if sku_age_days is not None and sku_age_days < 30:
+        return "评估保留，新品保护期30天，到期复查"
+
+    # 长期滞销直接下架
+    if sku_age_days is not None and sku_age_days > 90 and efficiency == "零销负销":
+        return "立即下架，长期滞销SKU"
+
+    # 高危 SKU 保持原有逻辑
     if risk == "高危" and inventory_depth in ["浅库存", "零库存"]:
         return "立即下架止损"
     elif risk == "高危" and inventory_depth == "中库存":
         return "整改观察+限量销售，7天未改善则下架"
     elif risk == "高危" and inventory_depth == "深库存":
         return "整改+清库存，7天观察期，同步启动退货流程"
-    elif risk == "中危" and efficiency in ["低动销", "零销负销"]:
-        return "限制补货，优先清理库存，观察30天"
-    elif risk == "中危" and efficiency in ["核心主力", "潜力培育"]:
-        return "维持现有销售，加强品质监控，月度复查"
-    elif risk == "低危" and efficiency == "零销负销":
+
+    # 中危 / 低危 + 零销负销：多维度决策
+    if efficiency == "零销负销":
+        if can_return_to_supplier:
+            return "退货供应商，完全止损"
+        if has_bundle_sku:
+            return "捆绑销售，蹭流量清库存"
+        if is_multi_site:
+            return "多站点调拨或报活动清库存"
+        if inventory_depth in ["深库存", "中库存"]:
+            return "报活动清库存（Spotlight Sale / Deal Portal）"
         return "直接清退下架"
-    elif risk == "低危" and efficiency == "低动销":
+
+    # 中危 + 低动销
+    if risk == "中危" and efficiency == "低动销":
+        return "限制补货，优先清理库存，观察30天"
+
+    # 低危 + 低动销
+    if risk == "低危" and efficiency == "低动销":
+        if inventory_depth in ["深库存", "中库存"]:
+            return "降价10-20%或报活动，观察2周"
         return "评估是否保留，无战略价值建议清退"
-    elif risk == "低危" and efficiency in ["核心主力", "潜力培育"]:
+
+    # 核心主力 / 潜力培育
+    if efficiency in ["核心主力", "潜力培育"]:
+        if risk == "中危":
+            return "维持现有销售，加强品质监控，月度复查"
         return "正常运营，持续监控RMA变化"
-    else:
-        return "需人工评估"
+
+    return "需人工评估"
 
 
 # ══════════════════════════════════════════════════════════
