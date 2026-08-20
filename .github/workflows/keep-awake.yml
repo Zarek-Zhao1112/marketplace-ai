@@ -1,0 +1,26 @@
+name: Keep AI Ops Platform Awake
+
+on:
+  schedule:
+    - cron: "0 */4 * * *"   # 每 4 小时（UTC）
+  workflow_dispatch:        # 可手动 Run workflow 测试
+
+permissions:
+  contents: read
+
+jobs:
+  keep-awake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping Streamlit app to refresh activity
+        run: |
+          URL="https://marketplace-ai-5pcdqykzdvcxzqq8deumab.streamlit.app/"
+          echo "Pinging $URL"
+          HTTP_CODE=$(curl -sS -L -o /dev/null -w "%{http_code}" "$URL")
+          echo "HTTP status: $HTTP_CODE"
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
+            echo "OK - app is awake (or waking up)."
+          else
+            echo "WARN - unexpected status $HTTP_CODE"; exit 1
+          fi
